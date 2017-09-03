@@ -22,7 +22,7 @@ import hashlib
 import logging
 
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ForeignKey
 
 Base = declarative_base()
 
@@ -71,7 +71,7 @@ class File(Base):
     mtime   = Column(DateTime)
     atime   = Column(DateTime)
     mode    = Column(Integer)
-    size    = Column(Integer)
+    size    = Column(BigInteger)
     uid     = Column(Integer)
     gid     = Column(Integer)
     md5sum  = Column(String(MD5SumLength), index=True)
