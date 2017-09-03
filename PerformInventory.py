@@ -122,8 +122,13 @@ if __name__ == '__main__':
     level = loglevels[min(args.verbose, len(loglevels)- 1)]
     logging.basicConfig(level = level, format = '%(asctime)s %(message)s')
     
-    connectstr = '{}://{}:{}@{}/{}'.format(args.connector, args.user, 
-                  args.password, args.host, args.schema)
+    if args.password:
+        connectstr = '{}://{}:{}@{}/{}'.format(args.connector, args.user, 
+                      args.password, args.host, args.schema)
+    else:
+        connectstr = '{}://{}@{}/{}'.format(args.connector, args.user, 
+                      args.host, args.schema)
+        
     try:
         engine = create_engine(connectstr, echo = True if level == logging.DEBUG else False)
     except sqlalchemy.exc.NoSuchModuleError as e:
@@ -140,10 +145,12 @@ if __name__ == '__main__':
         except sqlalchemy.exc.ProgrammingError as e:
             logging.critical("Error creating tables: {}".format(e))
         else:
-            logging.debug("Creating session")
+            logging.info("Creating session")
             session = Session()
+            if args.description:
+                args.description = args.description[:FileInventory.Job.MaxCommentLength]
             job = FileInventory.Job(host=socket.gethostname(), owner=args.user, 
-                      comment=args.description[:FileInventory.Job.MaxCommentLength],
+                      comment=args.description,
                       md5sum = True if args.md5sum else False)
             session.add(job)
             session.commit()
@@ -151,5 +158,5 @@ if __name__ == '__main__':
                 ProcessDirectory(session, d, job.id, args.md5sum)                    
             job.ended = datetime.datetime.now()
             session.commit()
-            logging.debug("Closing session")
+            logging.info("Closing session")
             session.close()
