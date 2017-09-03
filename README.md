@@ -2,8 +2,8 @@
 Python3/SQLAlchemy scripts to do inventory of (potentially) massive
 directories.
 ## Background
-We have several (ca 10**8) mostly MP3 files in a handful of
-directories, with some directories containing > 10**6 files.
+We have several (ca 10<sup>8</sup>) mostly MP3 files in a handful of
+directories, with some directories containing > 10<sup>6</sup> files.
 We also don't know how many of the files are duplicates
 (potentially many). 
 
