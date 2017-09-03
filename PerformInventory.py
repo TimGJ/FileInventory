@@ -2,9 +2,19 @@
 """
 Spyder Editor
 
-This is a temporary script file.
+Performs an inventory of files in a directory tree and sticks 
+deailts of them in a DB. This is do perform an inventory of
+~ 10**8 MP3 files, and it is therefore impossible to use tools such as 
+os.walk().
+
+Essentially this replicates the functionality of the standard 
+Linux tools find (to find the files), stat (to get the details)
+and md5sum (to compute the hash)
+
+Tim Greening-Jackson 30 August 2017
 """
 
+import sys
 import os
 import os.path
 import argparse
@@ -43,46 +53,61 @@ def GetArgs():
     ap.add_argument('dirs', metavar ='directory', help='Directory to scan', nargs='*', default=[os.getcwd()])
     return ap.parse_args()
 
-def ProcessDirectory(session, directory, job_id, compute_md5):
+def ProcessDirectory(session, directory, job_id, compute_md5, parent=None):
     """
     Scans the files in a directory, and sticks them in the 
     database. Note that as a directory potentially contains
     several million records, we commit on a regular basis to
-    avoid memory exhaustion
+    avoid memory exhaustion.
+    
+    Parameter root is a flag indicating whether this directory is the
+    root of the tree we are searching, so is True for the first call,
+    but False for any recursions.
     """
-    if os.path.isdir(directory):
-        logging.info("Processing directory {}".format(directory))
-
-        d = FileInventory.Directory(name = directory, job_id = job_id)
-        session.add(d)
-        session.commit() # Do a commit here as sometimes the DB gets behind itself and we get a FK integrity error
-        try:
-            with os.scandir(directory) as di:
-                for entry in di:
-                    if entry.is_dir():
-                        ProcessDirectory(session, os.path.join(directory, entry.name), job_id, compute_md5)
-                    if entry.is_file():
-                        try:
-                            st = entry.stat()
-                        except FileNotFoundError:
-                            logging.warning("No such file or directory {}".format(entry.name))
-                        else:
-                            f = FileInventory.File(serial = next(FileInventory.File.bates), dir_id = d.id, 
-                                     name = entry.name[-FileInventory.File.MaxFileNameLength:],
-                                     atime = datetime.datetime.fromtimestamp(st.st_atime), 
-                                     mtime = datetime.datetime.fromtimestamp(st.st_mtime), 
-                                     ctime = datetime.datetime.fromtimestamp(st.st_ctime), 
-                                     mode = st.st_mode, uid = st.st_uid, gid = st.st_gid,
-                                     size = st.st_size)
-                            if compute_md5:
-                                f.md5sum = FileInventory.MD5(os.path.join(directory, entry.name))
-                            session.add(f)
-                            if f.serial % FileInventory.File.MaxCommitRecords == 0: # Is it time to commit?
-                                session.commit()
-        except PermissionError as e:
-            logging.error("Can't read directory {}: {}".format(directory, e))
-    else:
-        logging.warning("{} is not a directory.".format(directory))
+    try:
+        if os.path.isdir(directory):
+            logging.info("Processing directory {}".format(directory))
+    
+            d = FileInventory.Directory(name = directory, job_id = job_id, parent = parent)
+            session.add(d)
+            session.commit() # Do a commit here as sometimes the DB gets behind itself and we get a FK integrity error
+            try:
+                with os.scandir(directory) as di:
+                    for entry in di:
+                        if entry.is_dir():
+                            ProcessDirectory(session, os.path.join(directory, entry.name), 
+                                             job_id, compute_md5, d.id)
+                        if entry.is_file():
+                            logging.debug('Processing file {}'.format(entry.name))
+                            try:
+                                st = entry.stat()
+                            except FileNotFoundError:
+                                logging.warning("No such file or directory {}".format(entry.name))
+                            else:
+                                f = FileInventory.File(serial = next(FileInventory.File.bates), dir_id = d.id, 
+                                         name = entry.name[-FileInventory.File.MaxFileNameLength:],
+                                         atime = datetime.datetime.fromtimestamp(st.st_atime), 
+                                         mtime = datetime.datetime.fromtimestamp(st.st_mtime), 
+                                         ctime = datetime.datetime.fromtimestamp(st.st_ctime), 
+                                         mode = st.st_mode, uid = st.st_uid, gid = st.st_gid,
+                                         size = st.st_size)
+                                if compute_md5:
+                                    f.md5sum = FileInventory.MD5(os.path.join(directory, entry.name))
+                                session.add(f)
+                                if f.serial % FileInventory.File.MaxCommitRecords == 0: # Is it time to commit?
+                                    session.commit()
+            except PermissionError as e:
+                logging.error("Can't read directory {}: {}".format(directory, e))
+        else:
+            logging.warning("{} is not a directory.".format(directory))
+    except KeyboardInterrupt:
+        # We check for keyboard interrupt (Ctrl-C) not only to handle such situations
+        # gracefully but also becuase if we haven't committed this can cause table
+        # locks which (in extremis) mean we might have to restart the database
+        logging.error("Job interrupted by user!")
+        session.commit()
+        session.close()
+        sys.exit(0)
     session.commit()
     
 if __name__ == '__main__':
@@ -100,7 +125,7 @@ if __name__ == '__main__':
     connectstr = '{}://{}:{}@{}/{}'.format(args.connector, args.user, 
                   args.password, args.host, args.schema)
     try:
-        engine = create_engine(connectstr, echo = True if args.verbose else False)
+        engine = create_engine(connectstr, echo = True if level == logging.DEBUG else False)
     except sqlalchemy.exc.NoSuchModuleError as e:
         logging.critical("Error creating engine: {}".format(e))
     else:
@@ -118,7 +143,8 @@ if __name__ == '__main__':
             logging.debug("Creating session")
             session = Session()
             job = FileInventory.Job(host=socket.gethostname(), owner=args.user, 
-                      comment=args.description[:FileInventory.Job.MaxCommentLength])
+                      comment=args.description[:FileInventory.Job.MaxCommentLength],
+                      md5sum = True if args.md5sum else False)
             session.add(job)
             session.commit()
             for d in args.dirs:

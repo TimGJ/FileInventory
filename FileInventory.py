@@ -22,7 +22,7 @@ import hashlib
 import logging
 
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 
 Base = declarative_base()
 
@@ -40,31 +40,33 @@ class Job(Base):
     owner   = Column(String(MaxOwnerNameLength))
     host    = Column(String(MaxHostNameLength))
     comment = Column(String(MaxCommentLength))
+    md5sum  = Column(Boolean, default=False)
 
 class Directory(Base):
     
     bates = itertools.count()
-    MaxDirNameLength = 100
+    MaxDirNameLength = 255
     
     __tablename__ = 'directory'
-    id      = Column(Integer, primary_key = True)
-    job_id  = Column(Integer, ForeignKey('job.id'), nullable=False)
-    name    = Column(String(MaxDirNameLength))
+    id      = Column(Integer, primary_key=True)
+    job_id  = Column(Integer, ForeignKey('job.id', ondelete='CASCADE'), nullable=False)
+    name    = Column(String(MaxDirNameLength), index=True)
+    parent  = Column(Integer, ForeignKey('directory.id', ondelete='CASCADE'), nullable=True, index=True)
     
 
 class File(Base):
     
     bates = itertools.count(1)
-    MaxFileNameLength = 100
-    MD5SumLength      =  32
-    DefaultMD5Chunk   = 1<<20 # 1 MiB
-    MaxCommitRecords  = 1<<16 # Commit to DB every 2**16 records
+    MaxFileNameLength =   255 # I've never seen one this long, fnarr, frnarr, but it is possible
+    MD5SumLength      =    32
+    DefaultMD5Chunk   = 1<<24 # 16 MiB
+    MaxCommitRecords  = 1<<14 # Commit to DB every 16K records. No particular reason for value
     
     __tablename__ = 'file'
     id      = Column(Integer, primary_key = True)
     serial  = Column(Integer)
-    dir_id  = Column(Integer, ForeignKey('directory.id'), nullable=False)
-    name    = Column(String(MaxFileNameLength))
+    dir_id  = Column(Integer, ForeignKey('directory.id', ondelete='CASCADE'), nullable=False)
+    name    = Column(String(MaxFileNameLength), index=True)
     ctime   = Column(DateTime)
     mtime   = Column(DateTime)
     atime   = Column(DateTime)
@@ -72,7 +74,7 @@ class File(Base):
     size    = Column(Integer)
     uid     = Column(Integer)
     gid     = Column(Integer)
-    md5sum  = Column(String(MD5SumLength))
+    md5sum  = Column(String(MD5SumLength), index=True)
 
 
 def MD5(filename, block_size=File.DefaultMD5Chunk):
@@ -85,7 +87,6 @@ def MD5(filename, block_size=File.DefaultMD5Chunk):
     try:
         with open(filename, 'rb') as f:
             md5 = hashlib.md5()
-           
             while True:
                 data = f.read(block_size)
                 if not data:
