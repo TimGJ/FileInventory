@@ -2,34 +2,38 @@
 Python3/SQLAlchemy scripts to do inventory of (potentially) massive
 directories.
 ## Background
-We have several (ca 10<sup>8</sup>) mostly MP3 files in a handful of
+I have several (ca 10<sup>8</sup>) mostly MP3 files in a handful of
 directories, with some directories containing > 10<sup>6</sup> files.
-We also don't know how many of the files are duplicates
+I also don't know how many of the files are duplicates
 (potentially many). 
 
-We therefore need to perform some sort of inventory on
-particular directory trees. Ordinarily we could do this
+I therefore need to perform some sort of inventory on
+particular directory trees. Ordinarily I could do this
 using something like `os.walk()`, but, given the
 potentially unknown number of files in a particular
 directory this would possibly fill memory. (The directories
 in question are too big for the standard Linux `ls`, `mv`
-etc, and we already have to do exotic nonsense like
+etc, and I already have to do exotic nonsense like
 ```
 $ find foo/ -type f -print0 | xargs -0 mv -t bar/
 ```
 and the like. 
 
-The FileInventory repo uses Python3 and SQLAlchemy to
-recurse down a particular directory structure and note each 
+The FileInventory software uses Python3 and SQLAlchemy to
+recurse down a particular directory structure and `stat` each 
 readable file it encounters therein, optionally performing
-an MD5 on each file as it goes. (Note that the MD5 option
-slows things down greatly, as each file has to be read.)
+an MD5 on each file as it goes. 
+
+(Note that the MD5 option slows things down greatly, as each 
+file has to be read in to memory in its entirity, rather than merely
+`stat`ed. This isn't a problem on small e.g. MP3 files, but can be on 
+large e.g. MySQLDump or ISO files)
 
 ## Prerequisites
 
-To run the software will require Python 3.x, the SQLAlchemy
+The software requires Python 3.x, the SQLAlchemy
 libraries and the appropriate DB connector e.g.
-mysql-connector for MySQL/MariaDB or pgsyco2 for 
+`mysql-connector` for MySQL/MariaDB or `pgsyco2` for 
 Postgres.
 
 It should be platform independent, but was developed in
@@ -43,7 +47,7 @@ weeks on large, slow system.
 
 ## Syntax
 
-Taken from the inbuild help:
+Taken from the inbuilt help:
 
 ```
 tim@merlin:/metatron/Projects/FileInventory$ python
