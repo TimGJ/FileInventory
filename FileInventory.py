@@ -60,7 +60,6 @@ class File(Base):
     MaxFileNameLength =   255 # I've never seen one this long, fnarr, frnarr, but it is possible
     MD5SumLength      =    32
     DefaultMD5Chunk   = 1<<24 # 16 MiB
-    MaxCommitRecords  = 1<<14 # Commit to DB every 16K records. No particular reason for value
     
     __tablename__ = 'file'
     id      = Column(Integer, primary_key = True)

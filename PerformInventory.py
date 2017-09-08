@@ -46,8 +46,7 @@ def GetArgs():
     ap.add_argument('--connector',   '-c', help='DB connector', default='mysql+mysqlconnector')
     ap.add_argument('--nuke',        '-n', help='Drop DB tables and restart', action='store_true')
     ap.add_argument('--md5sum',      '-m', help='Compute MD5 sum for each file', action='store_true')
-    ex.add_argument('--chunk-size',  '-g', help='Chunk size for computing MD5', default = FileInventory.File.DefaultMD5Chunk)
-    ex.add_argument('--commit-rec',  '-r', help='Max records after which to commit', default = FileInventory.File.MaxCommitRecords)
+    ex.add_argument('--sql-debug',   '-q', help='Print details of SQL commands', action='store_true')
     ex.add_argument('--verbose',     '-v', help='Verbosity', action='count')
 
     ap.add_argument('dirs', metavar ='directory', help='Directory to scan', nargs='*', default=[os.getcwd()])
@@ -94,8 +93,7 @@ def ProcessDirectory(session, directory, job_id, compute_md5, parent=None):
                                 if compute_md5:
                                     f.md5sum = FileInventory.MD5(os.path.join(directory, entry.name))
                                 session.add(f)
-                                if f.serial % FileInventory.File.MaxCommitRecords == 0: # Is it time to commit?
-                                    session.commit()
+                                session.commit()
             except PermissionError as e:
                 logging.error("Can't read directory {}: {}".format(directory, e))
         else:
@@ -130,7 +128,7 @@ if __name__ == '__main__':
                       args.host, args.schema)
         
     try:
-        engine = create_engine(connectstr, echo = True if level == logging.DEBUG else False)
+        engine = create_engine(connectstr, echo = True if args.sql_debug else False)
     except sqlalchemy.exc.NoSuchModuleError as e:
         logging.critical("Error creating engine: {}".format(e))
     else:
