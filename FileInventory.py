@@ -64,7 +64,7 @@ class File(Base):
     __tablename__ = 'file'
     id      = Column(Integer, primary_key = True)
     serial  = Column(Integer)
-    dir_id  = Column(Integer, ForeignKey('directory.id', ondelete='CASCADE'), nullable=False)
+    parent  = Column(Integer, ForeignKey('directory.id', ondelete='CASCADE'), nullable=False)
     name    = Column(String(MaxFileNameLength), index=True)
     ctime   = Column(DateTime)
     mtime   = Column(DateTime)

@@ -83,7 +83,7 @@ def ProcessDirectory(session, directory, job_id, compute_md5, parent=None):
                             except FileNotFoundError:
                                 logging.warning("No such file or directory {}".format(entry.name))
                             else:
-                                f = FileInventory.File(serial = next(FileInventory.File.bates), dir_id = d.id, 
+                                f = FileInventory.File(serial = next(FileInventory.File.bates), parent = d.id, 
                                          name = entry.name[-FileInventory.File.MaxFileNameLength:],
                                          atime = datetime.datetime.fromtimestamp(st.st_atime), 
                                          mtime = datetime.datetime.fromtimestamp(st.st_mtime), 
