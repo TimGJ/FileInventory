@@ -20,12 +20,12 @@ import itertools
 import datetime
 import hashlib
 import logging
-
+import re
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, ForeignKey
+from sqlalchemy.orm import validates
 
 Base = declarative_base()
-
 
 class Job(Base):
     
@@ -40,26 +40,40 @@ class Job(Base):
     owner   = Column(String(MaxOwnerNameLength))
     host    = Column(String(MaxHostNameLength))
     comment = Column(String(MaxCommentLength))
-    md5sum  = Column(Boolean, default=False)
+    md5sum  = Column(Boolean, nullable = True)
 
 class Directory(Base):
     
-    bates = itertools.count()
+    Bates = itertools.count(1)
     MaxDirNameLength = 255
-    
+    NameRe           = re.compile("[^\w\s_\.]")    
     __tablename__ = 'directory'
     id      = Column(Integer, primary_key=True)
     job_id  = Column(Integer, ForeignKey('job.id', ondelete='CASCADE'), nullable=False)
-    name    = Column(String(MaxDirNameLength), index=True)
+    serial  = Column(Integer)
     parent  = Column(Integer, ForeignKey('directory.id', ondelete='CASCADE'), nullable=True, index=True)
+    name    = Column(String(MaxDirNameLength), index=True)
+    ctime   = Column(DateTime)
+    mtime   = Column(DateTime)
+    atime   = Column(DateTime)
+    mode    = Column(Integer)
+    size    = Column(BigInteger)
+    uid     = Column(Integer)
+    gid     = Column(Integer)
     
+    def __repr__(self):
+        return "ID={} Parent={} Name={}".format(self.id, self.parent, self.name)
+    
+    def __lt__(self, other):
+        return self.name < other.name
 
 class File(Base):
     
-    bates = itertools.count(1)
+    Bates = itertools.count(1)
     MaxFileNameLength =   255 # I've never seen one this long, fnarr, frnarr, but it is possible
     MD5SumLength      =    32
     DefaultMD5Chunk   = 1<<24 # 16 MiB
+    NameRe            = re.compile("[^\w\s_\.]")
     
     __tablename__ = 'file'
     id      = Column(Integer, primary_key = True)
@@ -74,6 +88,16 @@ class File(Base):
     uid     = Column(Integer)
     gid     = Column(Integer)
     md5sum  = Column(String(MD5SumLength), index=True)
+    
+    @validates('name')
+    def ValidateName(self, key, value):
+        return File.NameRe.sub('', value.decode('utf-8'))
+    
+    def __repr__(self):
+        return "ID={} Parent={} Name={}".format(self.id, self.parent, self.name)
+    
+    def __lt__(self, other):
+        return self.name < other.name
 
 
 def MD5(filename, block_size=File.DefaultMD5Chunk):

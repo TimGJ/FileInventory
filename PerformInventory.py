@@ -22,6 +22,8 @@ import socket
 import getpass
 import datetime
 import logging
+import mysql.connector
+import mysql.connector.errors
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -52,6 +54,8 @@ def GetArgs():
     ap.add_argument('dirs', metavar ='directory', help='Directory to scan', nargs='*', default=[os.getcwd()])
     return ap.parse_args()
 
+
+
 def ProcessDirectory(session, directory, job_id, compute_md5, parent=None):
     """
     Scans the files in a directory, and sticks them in the 
@@ -67,7 +71,9 @@ def ProcessDirectory(session, directory, job_id, compute_md5, parent=None):
         if os.path.isdir(directory):
             logging.info("Processing directory {}".format(directory))
     
-            d = FileInventory.Directory(name = directory, job_id = job_id, parent = parent)
+            d = FileInventory.Directory(name = directory, job_id = job_id, 
+                                        parent = parent, 
+                                        serial = next(FileInventory.Directory.Bates))
             session.add(d)
             session.commit() # Do a commit here as sometimes the DB gets behind itself and we get a FK integrity error
             try:
@@ -83,8 +89,8 @@ def ProcessDirectory(session, directory, job_id, compute_md5, parent=None):
                             except FileNotFoundError:
                                 logging.warning("No such file or directory {}".format(entry.name))
                             else:
-                                f = FileInventory.File(serial = next(FileInventory.File.bates), parent = d.id, 
-                                         name = entry.name[-FileInventory.File.MaxFileNameLength:],
+                                f = FileInventory.File(serial = next(FileInventory.File.Bates), parent = d.id, 
+                                         name = entry.name.encode('utf8')[-FileInventory.File.MaxFileNameLength:],
                                          atime = datetime.datetime.fromtimestamp(st.st_atime), 
                                          mtime = datetime.datetime.fromtimestamp(st.st_mtime), 
                                          ctime = datetime.datetime.fromtimestamp(st.st_ctime), 
@@ -92,8 +98,13 @@ def ProcessDirectory(session, directory, job_id, compute_md5, parent=None):
                                          size = st.st_size)
                                 if compute_md5:
                                     f.md5sum = FileInventory.MD5(os.path.join(directory, entry.name))
-                                session.add(f)
-                                session.commit()
+                                try:
+                                    session.add(f)
+                                    session.commit()
+                                except mysql.connector.errors.Error as e:
+                                    logging.error("Error committing file {}: {}".format(f.name, e))
+                                    session.rollback()
+
             except PermissionError as e:
                 logging.error("Can't read directory {}: {}".format(directory, e))
         else:
@@ -136,9 +147,9 @@ if __name__ == '__main__':
         try:
             if args.nuke:
                 logging.info("Dropping existing tables")
-                FileInventory.File.__table__.drop(engine)
-                FileInventory.Directory.__table__.drop(engine)
-                FileInventory.Job.__table__.drop(engine)
+                FileInventory.File.__table__.drop(engine, checkfirst = True)
+                FileInventory.Directory.__table__.drop(engine, checkfirst = True)
+                FileInventory.Job.__table__.drop(engine, checkfirst = True)
             FileInventory.Base.metadata.create_all(engine, checkfirst = True)
         except sqlalchemy.exc.ProgrammingError as e:
             logging.critical("Error creating tables: {}".format(e))
