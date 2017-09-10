@@ -150,7 +150,8 @@ if __name__ == '__main__':
                       args.host, args.schema)
         
     try:
-        engine = create_engine(connectstr, echo = True if args.sql_debug else False)
+        engine = create_engine(connectstr, pool_recycle=3600, 
+                               echo = True if args.sql_debug else False)
     except sqlalchemy.exc.NoSuchModuleError as e:
         logging.critical("Error creating engine: {}".format(e))
     else:

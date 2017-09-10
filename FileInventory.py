@@ -46,7 +46,7 @@ class Directory(Base):
     
     Bates = itertools.count(1)
     MaxDirNameLength = 255
-    NameRe           = re.compile("[^-\w\s_\./]")    
+    NameRe           = re.compile("[^-\w\s_\./-]")    
     __tablename__ = 'directory'
     id      = Column(Integer, primary_key=True)
     job_id  = Column(Integer, ForeignKey('job.id', ondelete='CASCADE'), nullable=False)
@@ -86,7 +86,7 @@ class File(Base):
     MaxFileNameLength =   255 # I've never seen one this long, fnarr, frnarr, but it is possible
     MD5SumLength      =    32
     DefaultMD5Chunk   = 1<<24 # 16 MiB
-    NameRe            = re.compile("[^\w\s_\.]")
+    NameRe            = re.compile("[^\w\s_\.-]")
     
     __tablename__ = 'file'
     id      = Column(Integer, primary_key = True)
