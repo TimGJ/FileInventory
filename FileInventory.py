@@ -46,7 +46,7 @@ class Directory(Base):
     
     Bates = itertools.count(1)
     MaxDirNameLength = 255
-    NameRe           = re.compile("[^\w\s_\.]")    
+    NameRe           = re.compile("[^-\w\s_\./]")    
     __tablename__ = 'directory'
     id      = Column(Integer, primary_key=True)
     job_id  = Column(Integer, ForeignKey('job.id', ondelete='CASCADE'), nullable=False)
@@ -61,6 +61,19 @@ class Directory(Base):
     uid     = Column(Integer)
     gid     = Column(Integer)
     
+    @validates('name')
+    def ValidateName(self, key, value):
+        """
+        It is possible for files to be created with strange characters in
+        their names. This breaks MySQL varchar() quite horribly, so strip
+        nonsense characters out.
+        """
+        if type(value) is bytes:
+            name = value.decode('utf-8')
+        else:
+            name = str(value)
+        return Directory.NameRe.sub('?', name)
+
     def __repr__(self):
         return "ID={} Parent={} Name={}".format(self.id, self.parent, self.name)
     
@@ -91,7 +104,13 @@ class File(Base):
     
     @validates('name')
     def ValidateName(self, key, value):
-        return File.NameRe.sub('', value.decode('utf-8'))
+        """
+        It is possible for files to be created with strange characters in
+        their names. This breaks MySQL varchar() quite horribly, so strip
+        nonsense characters out.
+        """
+        name = value.decode('utf-8')
+        return File.NameRe.sub('?', name)
     
     def __repr__(self):
         return "ID={} Parent={} Name={}".format(self.id, self.parent, self.name)

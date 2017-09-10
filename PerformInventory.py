@@ -71,11 +71,22 @@ def ProcessDirectory(session, directory, job_id, compute_md5, parent=None):
         if os.path.isdir(directory):
             logging.info("Processing directory {}".format(directory))
     
-            d = FileInventory.Directory(name = directory, job_id = job_id, 
-                                        parent = parent, 
-                                        serial = next(FileInventory.Directory.Bates))
-            session.add(d)
-            session.commit() # Do a commit here as sometimes the DB gets behind itself and we get a FK integrity error
+            try:
+                st = os.stat(directory)
+            except FileNotFoundError:
+                logging.warning("No such file or directory {}".format(directory))
+            else:
+                d = FileInventory.Directory(name = os.path.split(directory)[1], 
+                            job_id = job_id, parent = parent, 
+                            serial = next(FileInventory.Directory.Bates),
+                            atime = datetime.datetime.fromtimestamp(st.st_atime), 
+                            mtime = datetime.datetime.fromtimestamp(st.st_mtime), 
+                            ctime = datetime.datetime.fromtimestamp(st.st_ctime), 
+                            mode = st.st_mode, uid = st.st_uid, gid = st.st_gid,
+                            size = st.st_size)
+                
+                session.add(d)
+                session.commit() # Do a commit here as sometimes the DB gets behind itself and we get a FK integrity error
             try:
                 with os.scandir(directory) as di:
                     for entry in di:
@@ -164,7 +175,8 @@ if __name__ == '__main__':
             session.add(job)
             session.commit()
             for d in args.dirs:
-                ProcessDirectory(session, d, job.id, args.md5sum)                    
+                ProcessDirectory(session, os.path.abspath(d), 
+                                 job.id, args.md5sum)                    
             job.ended = datetime.datetime.now()
             session.commit()
             logging.info("Closing session")
