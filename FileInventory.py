@@ -29,14 +29,16 @@ Base = declarative_base()
 
 class Job(Base):
     
-    MaxOwnerNameLength =  20
-    MaxHostNameLength  =  20
-    MaxCommentLength   =  80
+    MaxOwnerNameLength =   20
+    MaxHostNameLength  =   20
+    MaxCommentLength   =   80
+    MaxPathLength      = 4096
     
     __tablename__ = 'job'
     id      = Column(Integer, primary_key = True)
     started = Column(DateTime, default=datetime.datetime.now)
     ended   = Column(DateTime)
+    path    = Column(String(MaxPathLength))
     owner   = Column(String(MaxOwnerNameLength))
     host    = Column(String(MaxHostNameLength))
     comment = Column(String(MaxCommentLength))

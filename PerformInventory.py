@@ -76,7 +76,18 @@ def ProcessDirectory(session, directory, job_id, compute_md5, parent=None):
             except FileNotFoundError:
                 logging.warning("No such file or directory {}".format(directory))
             else:
-                d = FileInventory.Directory(name = os.path.split(directory)[1], 
+                if parent: # If there is no parent then there is no relative directory name
+                   
+                    d = FileInventory.Directory(name = os.path.split(directory)[1], 
+                            job_id = job_id, parent = parent, 
+                            serial = next(FileInventory.Directory.Bates),
+                            atime = datetime.datetime.fromtimestamp(st.st_atime), 
+                            mtime = datetime.datetime.fromtimestamp(st.st_mtime), 
+                            ctime = datetime.datetime.fromtimestamp(st.st_ctime), 
+                            mode = st.st_mode, uid = st.st_uid, gid = st.st_gid,
+                            size = st.st_size)
+                else:
+                    d = FileInventory.Directory(
                             job_id = job_id, parent = parent, 
                             serial = next(FileInventory.Directory.Bates),
                             atime = datetime.datetime.fromtimestamp(st.st_atime), 
@@ -170,14 +181,15 @@ if __name__ == '__main__':
             session = Session()
             if args.description:
                 args.description = args.description[:FileInventory.Job.MaxCommentLength]
-            job = FileInventory.Job(host=socket.gethostname(), owner=args.user, 
-                      comment=args.description,
-                      md5sum = True if args.md5sum else False)
-            session.add(job)
-            session.commit()
             for d in args.dirs:
-                ProcessDirectory(session, os.path.abspath(d), 
-                                 job.id, args.md5sum)                    
+                pathname = os.path.abspath(d)
+                job = FileInventory.Job(host=socket.gethostname(), owner=args.user, 
+                          comment=args.description, path = pathname,
+                          md5sum = True if args.md5sum else False)
+                session.add(job)
+                session.commit()
+                ProcessDirectory(session, pathname, 
+                                 job.id, args.md5sum, parent=None)                    
             job.ended = datetime.datetime.now()
             session.commit()
             logging.info("Closing session")
