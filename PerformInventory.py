@@ -190,7 +190,7 @@ if __name__ == '__main__':
                 session.commit()
                 ProcessDirectory(session, pathname, 
                                  job.id, args.md5sum, parent=None)                    
-            job.ended = datetime.datetime.now()
-            session.commit()
+                job.ended = datetime.datetime.now()
+                session.commit()
             logging.info("Closing session")
             session.close()
